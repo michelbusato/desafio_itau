@@ -27,16 +27,17 @@ import lombok.extern.log4j.Log4j2;
 @Tag(name = "Quotation", description = "Quotation management APIs")
 @Log4j2
 public class QuotationController {
-	
+
 	private final String CATEGORIA_NAO_INFORMADA = "Campo categoria não informada";
 	private final String VALOR_NAO_INFORMADO = "Campo valor não informado";
 	private final String CATEGORIA_INFORMADA_INVALIDA = "Categoria Invalida";
-	
+	private final String TARIFA_BASE_INFORMADA_INVALIDA = "Tarifa Base Invalida";
+
 	private FindCategoryByNameUseCase findCategoryByNameUseCase;
 	private CalculatePriceUseCase calculatePriceUseCase;
 	private SaveQuotationUseCase saveQuotationUseCase;
-	
-	
+
+
 	public QuotationController(FindCategoryByNameUseCase findCategoryByNameUseCase, CalculatePriceUseCase calculatePriceUseCase, SaveQuotationUseCase saveQuotationUseCase) {
 		super();
 		this.findCategoryByNameUseCase = findCategoryByNameUseCase;
@@ -47,55 +48,60 @@ public class QuotationController {
 
 
 	@PostMapping("/")
-    public ResponseEntity<?> create(@Valid @RequestBody QuotationRequestDTO dto) {
+	public ResponseEntity<?> create(@Valid @RequestBody QuotationRequestDTO dto) {
 		try {
-		log.debug("start create quotation");
-		
-		if(dto.getCategory() == null || dto.getCategory().isBlank() || dto.getCategory().isEmpty()) {
-			return new ResponseEntity<>(CATEGORIA_NAO_INFORMADA, HttpStatus.BAD_REQUEST);
-		}
-		
-		if(dto.getValue() == null) {
-			return new ResponseEntity<>(VALOR_NAO_INFORMADO, HttpStatus.BAD_REQUEST);
-		}
-		
-		Optional<Category> category = findCategoryByNameUseCase.handle(dto.getCategory());
-		
-		BigDecimal valorTarifado = BigDecimal.ZERO;
-		
-		if(category.isPresent()) {
-			valorTarifado = calculatePriceUseCase.handle(category, dto.getValue());
-		}else {
-			return new ResponseEntity<>(CATEGORIA_INFORMADA_INVALIDA, HttpStatus.BAD_REQUEST);
-		}
-		
-		
-		
-		
-		Quotation objBd = saveQuotationUseCase.handle(category.get(), valorTarifado, dto.getValue());
-		
-		if(objBd != null) {
+			log.info("start create quotation");
+
+			if(dto.getCategory() == null || dto.getCategory().isBlank() || dto.getCategory().isEmpty()) {
+				return new ResponseEntity<>(CATEGORIA_NAO_INFORMADA, HttpStatus.BAD_REQUEST);
+			}
+
+			if(dto.getValue() == null) {
+				return new ResponseEntity<>(VALOR_NAO_INFORMADO, HttpStatus.BAD_REQUEST);
+			}
 			
-			QuotationResponseDTO responseDTO = QuotationResponseDTO.
-												builder()
-												.categoria(category.get().getDescription())
-												.nome(category.get().getName())
-												.precoBase(dto.getValue())
-												.id(objBd.getUuid())
-												.precoTarifado(valorTarifado.setScale(2)).build();
+			if (dto.getValue() == null || dto.getValue().compareTo(new BigDecimal(0)) < 1) {
+				return new ResponseEntity<>(TARIFA_BASE_INFORMADA_INVALIDA, HttpStatus.BAD_REQUEST);
+			}
 			
-	        return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
-			
-			
-		}
+			log.info("find category {}", dto.getCategory());
+			Optional<Category> category = findCategoryByNameUseCase.handle(dto.getCategory());
+
+			BigDecimal valorTarifado = BigDecimal.ZERO;
+
+			if(category.isPresent()) {
+				log.info("calculate price tarifed with price base{}", dto.getValue());
+				valorTarifado = calculatePriceUseCase.handle(category.get(), dto.getValue());
+				log.info("price tarifed withe price base{}", dto.getValue());
+			}else {
+				return new ResponseEntity<>(CATEGORIA_INFORMADA_INVALIDA, HttpStatus.BAD_REQUEST);
+			}
+
+			log.info("save quotation in bd ");
+			Quotation objBd = saveQuotationUseCase.handle(category.get(), valorTarifado, dto.getValue());
 		
-		log.debug("end create quotation");		
-        return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
-		
+			if(objBd != null) {
+				log.info("save sucess quotation in bd with uuid {}", objBd.getUuid());
+				QuotationResponseDTO responseDTO = QuotationResponseDTO.
+						builder()
+						.categoria(category.get().getName())
+						.nome(category.get().getDescription())
+						.precoBase(dto.getValue())
+						.id(objBd.getUuid())
+						.precoTarifado(valorTarifado.setScale(2)).build();
+
+				return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
+
+
+			}
+
+			log.info("end create quotation");		
+			return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+
 		}catch (Exception e) {
 			log.error(e.getMessage());
 			throw e;
 		}
-    }
+	}
 
 }

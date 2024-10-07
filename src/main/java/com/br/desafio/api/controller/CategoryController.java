@@ -15,25 +15,30 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.log4j.Log4j2;
 
 @RestController
-@RequestMapping("/v1/api/quotation")
+@RequestMapping("/v1/api/category")
 @Tag(name = "Category", description = "Category management APIs")
 @Log4j2
 public class CategoryController {
-	
+
 	FindAllCategoryDTOUseCase findAllCategoryUseCase;	
-	
-	
+
+
 	public CategoryController(FindAllCategoryDTOUseCase findAllCategoryUseCase) {
 		super();
 		this.findAllCategoryUseCase = findAllCategoryUseCase;
 	}
 
 	@GetMapping("/")
-    public ResponseEntity<List<CategoryResponseDTO>> getAllCategory() {		
-		log.debug("start find all category");
-		List<CategoryResponseDTO> list = findAllCategoryUseCase.handle();
-		log.debug("end find all category");		
-        return new ResponseEntity<>(list, HttpStatus.OK);
-    }
+	public ResponseEntity<List<CategoryResponseDTO>> getAllCategory() {
+		try {
+			log.info("start find all category");
+			List<CategoryResponseDTO> list = findAllCategoryUseCase.handle();
+			log.info("end find all category");		
+			return new ResponseEntity<>(list, HttpStatus.OK);
+		}catch(Exception e) {
+			log.error(e.getMessage());
+			throw e;
+		}
+	}
 
 }
